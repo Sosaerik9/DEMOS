@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEMOS (Carga por Captura)</title>
+    <!-- Cargamos Tesseract.js para leer el texto de la imagen -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 600px;
+        }
+        h2 { text-align: center; color: #333; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        
+        /* Área de captura */
+        .capture-area {
+            border: 2px dashed #ff7f50;
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 8px;
+            background-color: #fff9f5;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+        .capture-area.active {
+            border-color: #25D366;
+            background-color: #e8f8ec;
+            transform: scale(1.02);
+        }
+        .capture-area span {
+            font-size: 18px;
+            font-weight: bold;
+            color: #555;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .paste-hint {
+            font-size: 14px;
+            color: #888;
+            background: #eee;
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: inline-block;
+        }
+
+        /* Cajas de texto */
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+
+        /* Botones generales */
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #ff7f50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+        button:hover { background-color: #e5673b; }
+        
+        /* Área de resultado */
+        #resultado-container { display: none; margin-top: 20px; }
+        #mensajeGenerado {
+            background-color: #eef2f5;
+            border-left: 5px solid #ff7f50;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        /* Estilos específicos de botones de acción */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-copiar { 
+            background-color: #4a90e2; 
+            flex: 1;
+        }
+        .btn-copiar:hover { background-color: #357abd; }
+        
+        .btn-whatsapp { 
+            background-color: #25D366; 
+            flex: 1;
+        }
+        .btn-whatsapp:hover { background-color: #1ebe57; }
+        
+        .loading { display: none; text-align: center; color: #ff7f50; font-weight: bold; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>DEMOS</h2>
+
+    <!-- Área de Captura Directa -->
+    <div class="capture-area" id="captureArea">
+        <span id="statusText">Haz tu captura de pantalla y pégala aquí</span>
+        <div class="paste-hint">Presiona <b>Ctrl + V</b> (o Cmd + V en Mac)</div>
+    </div>
+    <div class="loading" id="loading">Extrayendo datos de la imagen...</div>
+
+    <!-- Formulario -->
+    <div class="form-group">
+        <label>Usuario (Se extrae de la captura):</label>
+        <input type="text" id="usuario" placeholder="Ej: usuario123">
+    </div>
+    <div class="form-group">
+        <label>Contraseña (Se extrae de la captura):</label>
+        <input type="text" id="password" placeholder="Ej: 555666">
+    </div>
+
+    <div class="form-group">
+        <label>Seleccionar Duración del Plan:</label>
+        <select id="duracion">
+            <option value="2">2 Horas</option>
+            <option value="6">6 Horas</option>
+            <option value="12">12 Horas</option>
+            <option value="24">24 Horas</option>
+            <option value="48">48 Horas</option>
+        </select>
+    </div>
+
+    <!-- Botón Generar -->
+    <button id="btnGenerar" onclick="generarMensaje()">Crear Mensaje</button>
+
+    <!-- Resultado y Acciones -->
+    <div id="resultado-container">
+        <label>Mensaje Generado:</label>
+        <div id="mensajeGenerado"></div>
+        
+        <div class="action-buttons">
+            <button class="btn-copiar" onclick="copiarMensaje(this)">Copiar Mensaje 📋</button>
+            <button class="btn-whatsapp" onclick="enviarWhatsApp()">Enviar por WhatsApp 📱</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const captureArea = document.getElementById('captureArea');
+    const statusText = document.getElementById('statusText');
+    const loading = document.getElementById('loading');
+    const selectDuracion = document.getElementById('duracion');
+    
+    let tipoPlantilla = "PANA"; 
+
+    // --- Lógica de Pegado Directo (Ctrl+V) ---
+    document.addEventListener('paste', (e) => {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        
+        for (let index in items) {
+            const item = items[index];
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                const blob = item.getAsFile();
+                
+                captureArea.classList.add('active');
+                statusText.innerText = "¡Captura detectada! Procesando...";
+                
+                procesarImagen(blob);
+                e.preventDefault();
+                break;
+            }
+        }
+    });
+
+    // --- Lógica de OCR ---
+    function procesarImagen(file) {
+        loading.style.display = 'block';
+        
+        Tesseract.recognize(
+            file,
+            'spa',
+            { logger: m => console.log(m) }
+        ).then(({ data: { text } }) => {
+            loading.style.display = 'none';
+            statusText.innerText = "¡Datos extraídos con éxito!";
+            procesarDatos(text);
+            
+            setTimeout(() => {
+                captureArea.classList.remove('active');
+                statusText.innerText = "Pega otra captura si lo deseas";
+            }, 2000);
+            
+        }).catch(err => {
+            console.error(err);
+            loading.style.display = 'none';
+            statusText.innerText = "Error al leer la imagen.";
+            captureArea.classList.remove('active');
+            alert("Error al leer la imagen. Asegúrate de que sea una captura clara.");
+        });
+    }
+
+    // --- Lógica de extracción de datos ---
+    function procesarDatos(texto) {
+        const lineas = texto.split('\n').map(l => l.trim()).filter(l => l !== '');
+        
+        let usuario = "";
+        let password = "";
+        
+        const textoMin = texto.toLowerCase();
+        if (textoMin.includes('stella') || textoMin.includes('nombre de usuario') || textoMin.includes('conexiones max')) {
+            tipoPlantilla = "STELLA";
+            actualizarSelectStella();
+        } else {
+            tipoPlantilla = "PANA";
+            actualizarSelectPana();
+        }
+
+        for (let i = 0; i < lineas.length; i++) {
+            const lineaMin = lineas[i].toLowerCase();
+            
+            // Extraer USUARIO
+            if (lineaMin.includes('nombre de usuario') || lineaMin === 'usuario' || lineaMin.includes('username')) {
+                if (lineas[i].includes(':')) {
+                    usuario = lineas[i].split(':')[1].trim();
+                } else if (lineas[i].includes(' ')) {
+                    const posibleDato = lineas[i].replace(/nombre de usuario/i, '').replace(/usuario/i, '').trim();
+                    if (posibleDato.length > 0) usuario = posibleDato;
+                }
+
+                if (!usuario && lineas[i + 1]) {
+                    const lineaAbajo = lineas[i + 1].toLowerCase();
+                    if (!lineaAbajo.includes('contraseña') && !lineaAbajo.includes('dueño') && !lineaAbajo.includes('paquete')) {
+                        usuario = lineas[i + 1].replace(/:/g, '').trim();
+                    }
+                }
+            }
+
+            // Extraer CONTRASEÑA
+            if (lineaMin.includes('contraseña') || lineaMin.includes('password') || lineaMin === 'pass') {
+                if (lineas[i].includes(':')) {
+                    password = lineas[i].split(':')[1].trim();
+                } else if (lineas[i].includes(' ')) {
+                    const posibleDato = lineas[i].replace(/contraseña/i, '').replace(/password/i, '').trim();
+                    if (posibleDato.length > 0) password = posibleDato;
+                }
+
+                if (!password && lineas[i + 1]) {
+                    const lineaAbajo = lineas[i + 1].toLowerCase();
+                    if (!lineaAbajo.includes('dueño') && !lineaAbajo.includes('paquete')) {
+                        password = lineas[i + 1].replace(/:/g, '').trim();
+                    }
+                }
+            }
+        }
+
+        document.getElementById('usuario').value = usuario;
+        document.getElementById('password').value = password;
+        
+        if(!usuario || !password) {
+            alert("No se pudieron detectar todos los datos. Revisa las cajas y corrígelos si es necesario.");
+        }
+    }
+
+    // --- Actualizar selectores ---
+    function actualizarSelectStella() {
+        selectDuracion.innerHTML = `
+            <option value="2">2 Horas</option>
+            <option value="6">6 Horas</option>
+            <option value="24">24 Horas</option>
+        `;
+    }
+
+    function actualizarSelectPana() {
+        selectDuracion.innerHTML = `
+            <option value="2">2 Horas</option>
+            <option value="6">6 Horas</option>
+            <option value="12">12 Horas</option>
+            <option value="24">24 Horas</option>
+            <option value="48">48 Horas</option>
+        `;
+    }
+
+    // --- Generar mensaje ---
+    function generarMensaje() {
+        const user = document.getElementById('usuario').value || "No especificado";
+        const pass = document.getElementById('password').value || "No especificado";
+        const horas = parseInt(selectDuracion.value);
+
+        const ahora = new Date();
+        
+        const opcionesFecha = { day: '2-digit', month: '2-digit', year: 'numeric' };
+        const fechaEntrega = ahora.toLocaleDateString('es-ES', opcionesFecha);
+        const horaEntrega = ahora.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        
+        const fechaFinObj = new Date(ahora.getTime() + horas * 60 * 60 * 1000);
+        const fechaFin = fechaFinObj.toLocaleDateString('es-ES', opcionesFecha);
+        const horaFin = fechaFinObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+        let tituloBase = tipoPlantilla === "STELLA" ? "PRUEBA GRATIS STELLA TV PREMIUM" : "PRUEBA GRATIS PANAXTREAMING GO PLUS";
+
+        const mensaje = `*${tituloBase}* (${horas} HORAS)
+
+*USUARIO:* ${user}
+*CONTRASEÑA:* ${pass}
+
+FECHA Y HORA DE ENTREGA: ${fechaEntrega} - ${horaEntrega}
+FECHA Y HORA DE FINALIZACIÓN: ${fechaFin} - ${horaFin}
+
+*Por favor nos informas al ingresar !*`;
+
+        document.getElementById('mensajeGenerado').innerText = mensaje;
+        document.getElementById('resultado-container').style.display = 'block';
+        
+        window.mensajeParaWA = mensaje;
+    }
+
+    // --- FUNCIÓN CORREGIDA: Copiar al portapapeles con Fallback ---
+    function copiarMensaje(boton) {
+        if (!window.mensajeParaWA) return;
+        
+        const textoACopiar = window.mensajeParaWA;
+
+        // Método moderno
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(textoACopiar).then(() => {
+                mostrarExitoCopia(boton);
+            }).catch(err => {
+                console.error('Error al copiar con API moderna: ', err);
+                copiarFallback(textoACopiar, boton); // Intenta el método antiguo si falla
+            });
+        } else {
+            // Método antiguo (Fallback) para archivos locales (file:///)
+            copiarFallback(textoACopiar, boton);
+        }
+    }
+
+    function copiarFallback(texto, boton) {
+        // Creamos un textarea temporal
+        const textArea = document.createElement("textarea");
+        textArea.value = texto;
+        
+        // Lo hacemos invisible pero asegurándonos de que se pueda seleccionar
+        textArea.style.position = "fixed";
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.width = "2em";
+        textArea.style.height = "2em";
+        textArea.style.padding = "0";
+        textArea.style.border = "none";
+        textArea.style.outline = "none";
+        textArea.style.boxShadow = "none";
+        textArea.style.background = "transparent";
+        
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+            const exitoso = document.execCommand('copy');
+            if (exitoso) {
+                mostrarExitoCopia(boton);
+            } else {
+                alert("Tu navegador bloqueó la copia automática. Por favor selecciona el texto y cópialo con Ctrl+C.");
+            }
+        } catch (err) {
+            console.error('Error al copiar (fallback): ', err);
+            alert("Tu navegador bloqueó la copia automática. Por favor selecciona el texto y cópialo con Ctrl+C.");
+        }
+
+        document.body.removeChild(textArea);
+    }
+
+    function mostrarExitoCopia(boton) {
+        const textoOriginal = boton.innerText;
+        const colorOriginal = boton.style.backgroundColor;
+        
+        boton.innerText = "¡Copiado! ✅";
+        boton.style.backgroundColor = "#28a745";
+        
+        setTimeout(() => {
+            boton.innerText = textoOriginal;
+            boton.style.backgroundColor = colorOriginal;
+        }, 2000);
+    }
+
+    // --- Enviar a WhatsApp ---
+    function enviarWhatsApp() {
+        if (!window.mensajeParaWA) return;
+        const textoCodificado = encodeURIComponent(window.mensajeParaWA);
+        window.open(`https://wa.me/?text=${textoCodificado}`, '_blank');
+    }
+</script>
+
+</body>
+</html>

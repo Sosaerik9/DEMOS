@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DEMOS (Carga por Captura)</title>
+    <title>Generador de Mensajes IPTV (Carga por Captura)</title>
     <!-- Cargamos Tesseract.js para leer el texto de la imagen -->
     <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
     <style>
@@ -121,7 +121,7 @@
 <body>
 
 <div class="container">
-    <h2>DEMOS</h2>
+    <h2>Generador de Mensajes</h2>
 
     <!-- Área de Captura Directa -->
     <div class="capture-area" id="captureArea">
@@ -143,7 +143,6 @@
     <div class="form-group">
         <label>Seleccionar Duración del Plan:</label>
         <select id="duracion">
-            <option value="2">2 Horas</option>
             <option value="6">6 Horas</option>
             <option value="12">12 Horas</option>
             <option value="24">24 Horas</option>
@@ -293,7 +292,6 @@
 
     function actualizarSelectPana() {
         selectDuracion.innerHTML = `
-            <option value="2">2 Horas</option>
             <option value="6">6 Horas</option>
             <option value="12">12 Horas</option>
             <option value="24">24 Horas</option>
@@ -301,7 +299,7 @@
         `;
     }
 
-    // --- Generar mensaje ---
+    // --- Generar mensaje (AHORA CON EMOJIS) ---
     function generarMensaje() {
         const user = document.getElementById('usuario').value || "No especificado";
         const pass = document.getElementById('password').value || "No especificado";
@@ -319,15 +317,16 @@
 
         let tituloBase = tipoPlantilla === "STELLA" ? "PRUEBA GRATIS STELLA TV PREMIUM" : "PRUEBA GRATIS PANAXTREAMING GO PLUS";
 
-        const mensaje = `*${tituloBase}* (${horas} HORAS)
+        // Estructura del mensaje con emojis
+        const mensaje = `🎬 *${tituloBase}* (${horas} HORAS) 🍿
 
-*USUARIO:* ${user}
-*CONTRASEÑA:* ${pass}
+👤 *USUARIO:* ${user}
+🔑 *CONTRASEÑA:* ${pass}
 
-FECHA Y HORA DE ENTREGA: ${fechaEntrega} - ${horaEntrega}
-FECHA Y HORA DE FINALIZACIÓN: ${fechaFin} - ${horaFin}
+🕒 FECHA Y HORA DE ENTREGA: ${fechaEntrega} - ${horaEntrega}
+⏳ FECHA Y HORA DE FINALIZACIÓN: ${fechaFin} - ${horaFin}
 
-*Por favor nos informas al ingresar !*`;
+📲 *Por favor nos informas al ingresar !* ✅`;
 
         document.getElementById('mensajeGenerado').innerText = mensaje;
         document.getElementById('resultado-container').style.display = 'block';
@@ -335,32 +334,27 @@ FECHA Y HORA DE FINALIZACIÓN: ${fechaFin} - ${horaFin}
         window.mensajeParaWA = mensaje;
     }
 
-    // --- FUNCIÓN CORREGIDA: Copiar al portapapeles con Fallback ---
+    // --- Copiar al portapapeles con Fallback ---
     function copiarMensaje(boton) {
         if (!window.mensajeParaWA) return;
         
         const textoACopiar = window.mensajeParaWA;
 
-        // Método moderno
         if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(textoACopiar).then(() => {
                 mostrarExitoCopia(boton);
             }).catch(err => {
                 console.error('Error al copiar con API moderna: ', err);
-                copiarFallback(textoACopiar, boton); // Intenta el método antiguo si falla
+                copiarFallback(textoACopiar, boton);
             });
         } else {
-            // Método antiguo (Fallback) para archivos locales (file:///)
             copiarFallback(textoACopiar, boton);
         }
     }
 
     function copiarFallback(texto, boton) {
-        // Creamos un textarea temporal
         const textArea = document.createElement("textarea");
         textArea.value = texto;
-        
-        // Lo hacemos invisible pero asegurándonos de que se pueda seleccionar
         textArea.style.position = "fixed";
         textArea.style.top = "0";
         textArea.style.left = "0";
